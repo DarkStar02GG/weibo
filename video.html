@@ -3,31 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>🎬 视频</title>
+    <title>🎬 视频列表</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             background: #0f1a2e;
             min-height: 100vh;
             font-family: system-ui, -apple-system, sans-serif;
+            padding: 1.5rem;
             color: #e8edf5;
             -webkit-tap-highlight-color: transparent;
         }
+        .container { max-width: 800px; margin: 0 auto; }
 
         .nav-bar {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 0.8rem 1.2rem;
-            background: rgba(255,255,255,0.04);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
+            padding-bottom: 1.2rem;
             border-bottom: 1px solid rgba(255,255,255,0.06);
-            position: sticky;
-            top: 0;
-            z-index: 10;
+            margin-bottom: 1.5rem;
             flex-wrap: wrap;
-            gap: 8px;
+            gap: 10px;
         }
         .nav-bar .back-link {
             color: #8ba0c9;
@@ -55,11 +52,12 @@
             color: #5a7a9f;
         }
 
-        #listMode { padding: 1.5rem; max-width: 1000px; margin: 0 auto; }
+        /* ===== 视频网格 ===== */
         .video-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-            gap: 1.2rem;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
         }
         .video-card {
             background: rgba(255,255,255,0.04);
@@ -81,17 +79,17 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 2.8rem;
+            font-size: 2.5rem;
             color: #ff6b6b;
             position: relative;
         }
         .video-card .thumb .play-icon {
             position: absolute;
-            font-size: 2.8rem;
+            font-size: 2.5rem;
             color: rgba(255,255,255,0.7);
             text-shadow: 0 2px 20px rgba(0,0,0,0.6);
         }
-        .video-card .info { padding: 0.7rem 0.9rem 0.9rem; }
+        .video-card .info { padding: 0.6rem 0.8rem 0.8rem; }
         .video-card .info .name {
             font-weight: 500;
             font-size: 0.85rem;
@@ -99,7 +97,6 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            color: #c8d6e5;
         }
         .video-card .info .meta {
             font-size: 0.6rem;
@@ -108,194 +105,96 @@
         .empty-hint {
             grid-column: 1 / -1;
             text-align: center;
-            padding: 3rem 1rem;
+            padding: 2rem 1rem;
             color: #4a6a8f;
         }
-        .empty-hint i {
-            font-size: 2.5rem;
-            display: block;
-            margin-bottom: 0.8rem;
-            opacity: 0.4;
-        }
 
-        #playerMode {
-            display: none;
-            max-width: 880px;
-            margin: 0 auto;
-            padding: 1rem 1.2rem 1.8rem;
-        }
-        #playerMode.active { display: block; }
-        .video-wrapper {
-            position: relative;
-            width: 100%;
-            padding-bottom: 56.25%;
-            background: #000;
+        /* ===== 输入区域 ===== */
+        .input-area {
+            background: rgba(255,255,255,0.04);
             border-radius: 16px;
-            overflow: hidden;
+            padding: 1.2rem;
+            border: 1px solid rgba(255,255,255,0.06);
+            margin-top: 0.5rem;
         }
-        .video-wrapper video {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            border: 0;
-            outline: none;
-            background: #0a0a0a;
-            display: block;
-        }
-        .btn-turbo {
-            position: absolute;
-            top: 14px;
-            left: 14px;
-            z-index: 20;
-            background: rgba(0,0,0,0.65);
-            backdrop-filter: blur(8px);
-            border: 1px solid rgba(255,255,255,0.12);
-            color: #fff;
-            padding: 6px 14px;
-            border-radius: 40px;
-            font-size: 1rem;
-            font-weight: 700;
-            cursor: pointer;
-            transition: 0.2s;
+        .input-area .row {
             display: flex;
-            align-items: center;
-            gap: 4px;
-            touch-action: manipulation;
-        }
-        .btn-turbo:active { transform: scale(0.92); }
-        .btn-turbo.active {
-            background: rgba(255,215,0,0.25);
-            border-color: #ffd93d;
-            color: #ffd93d;
-        }
-        .btn-turbo .dot {
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: #4a6a8f;
-            transition: 0.2s;
-            display: inline-block;
-        }
-        .btn-turbo.active .dot { background: #ffd93d; box-shadow: 0 0 12px #ffd93d; }
-        .btn-turbo .sub { font-size: 0.45rem; font-weight: 400; opacity: 0.5; }
-
-        .player-info {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-top: 0.8rem;
-            color: #c8d6e5;
+            gap: 10px;
             flex-wrap: wrap;
-            gap: 6px;
         }
-        .player-info .name { font-size: 0.9rem; font-weight: 500; }
-        .player-info .badge {
+        .input-area input {
+            flex: 1;
+            padding: 0.7rem 1rem;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.08);
+            background: rgba(255,255,255,0.05);
+            color: #e8edf5;
+            font-size: 0.9rem;
+            outline: none;
+            min-width: 200px;
+        }
+        .input-area input:focus { border-color: #ff6b6b; }
+        .input-area input::placeholder { color: #5a7a9f; }
+        .input-area button {
+            padding: 0.7rem 1.5rem;
+            border: none;
+            border-radius: 12px;
+            background: #ff6b6b;
+            color: #fff;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.15s;
+            white-space: nowrap;
+        }
+        .input-area button:active { transform: scale(0.94); opacity: 0.8; }
+        .input-area .hint {
+            font-size: 0.7rem;
+            color: #5a7a9f;
+            margin-top: 0.6rem;
+        }
+        .input-area .hint code {
             background: rgba(255,255,255,0.06);
-            padding: 0.15rem 0.8rem;
-            border-radius: 40px;
+            padding: 0.1rem 0.5rem;
+            border-radius: 6px;
             font-size: 0.65rem;
             color: #8ba0c9;
-            border: 1px solid rgba(255,255,255,0.04);
+            word-break: break-all;
         }
-        .controls-bar {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-top: 0.6rem;
-            padding: 0.3rem 0.6rem;
-            background: rgba(255,255,255,0.03);
-            border-radius: 60px;
-            border: 1px solid rgba(255,255,255,0.05);
-            flex-wrap: wrap;
-            justify-content: center;
-        }
-        .controls-bar label {
-            color: #8ba0c9;
-            font-size: 0.75rem;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
-        .controls-bar select {
-            background: rgba(255,255,255,0.08);
-            color: #e8edf5;
-            border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 30px;
-            padding: 0.15rem 0.7rem;
-            font-size: 0.8rem;
-            cursor: pointer;
-            outline: none;
-        }
-        .controls-bar select option { background: #1a2639; color: #e8edf5; }
-        .speed-display {
-            color: #ffd93d;
-            font-weight: 500;
-            min-width: 36px;
-            text-align: center;
-            font-size: 0.85rem;
-        }
-        .status {
-            text-align: center;
-            margin-top: 0.4rem;
-            font-size: 0.75rem;
-            color: #5a7a9f;
-        }
-        .status .ok { color: #51cf66; }
-        .status .err { color: #ff6b6b; }
 
         @media (max-width: 480px) {
-            #listMode { padding: 0.8rem; }
-            .video-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 0.8rem; }
-            .video-card .info { padding: 0.4rem 0.6rem 0.6rem; }
-            .video-card .info .name { font-size: 0.75rem; }
-            #playerMode { padding: 0.5rem 0.8rem 1.2rem; }
-            .btn-turbo { top: 10px; left: 10px; padding: 4px 10px; font-size: 0.85rem; }
-            .controls-bar { gap: 6px; padding: 0.2rem 0.4rem; }
+            body { padding: 1rem; }
+            .video-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 0.7rem; }
+            .input-area .row { flex-direction: column; }
+            .input-area input { min-width: unset; }
+            .input-area button { width: 100%; }
         }
     </style>
 </head>
 <body>
 
-<div class="nav-bar">
-    <span class="back-link" id="navBack"><i class="fas fa-arrow-left"></i> <span id="navBackText">返回</span></span>
-    <span class="title"><i class="fas fa-video"></i> <span id="navTitle">视频列表</span></span>
-    <span class="info" id="navInfo">加载中...</span>
-</div>
+<div class="container">
+    <div class="nav-bar">
+        <a href="index.html" class="back-link"><i class="fas fa-arrow-left"></i> 返回</a>
+        <span class="title"><i class="fas fa-video"></i> 视频列表</span>
+        <span class="info" id="navInfo">加载中...</span>
+    </div>
 
-<!-- ===== 列表模式 ===== -->
-<div id="listMode">
+    <!-- ===== 视频网格 ===== -->
     <div class="video-grid" id="videoGrid">
         <div class="empty-hint"><i class="fas fa-video"></i> 暂无视频</div>
     </div>
-</div>
 
-<!-- ===== 播放器模式 ===== -->
-<div id="playerMode">
-    <div class="video-wrapper">
-        <video id="videoPlayer" controls playsinline preload="metadata">
-            <source id="videoSource" src="" type="video/mp4">
-            您的浏览器不支持视频播放。
-        </video>
-        <button class="btn-turbo" id="turboBtn"><span class="dot"></span> 3× <span class="sub">Turbo</span></button>
+    <!-- ===== 输入区域 ===== -->
+    <div class="input-area">
+        <div class="row">
+            <input type="text" id="videoUrlInput" placeholder="粘贴视频直链 或 蓝奏云链接">
+            <button id="playBtn">▶ 播放</button>
+        </div>
+        <div class="hint">
+            💡 直接粘贴 <code>https://xxx.mp4</code> 直链，或蓝奏云链接（自动解析）
+        </div>
     </div>
-    <div class="player-info">
-        <span class="name" id="playerName">视频</span>
-        <span class="badge" id="playerBadge">MP4</span>
-    </div>
-    <div class="controls-bar">
-        <label><i class="fas fa-gauge-high"></i> 倍速</label>
-        <select id="speedSelect">
-            <option value="0.25">0.25×</option><option value="0.5">0.5×</option>
-            <option value="0.75">0.75×</option><option value="1.0" selected>1.0×</option>
-            <option value="1.25">1.25×</option><option value="1.5">1.5×</option>
-            <option value="1.75">1.75×</option><option value="2.0">2.0×</option>
-            <option value="2.5">2.5×</option><option value="3.0">3.0×</option>
-        </select>
-        <span class="speed-display" id="speedDisplay">1.0×</span>
-    </div>
-    <div class="status" id="statusMsg"><i class="fas fa-check-circle ok"></i> 点击 3× 切换加速</div>
 </div>
 
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
@@ -303,42 +202,30 @@
 <script>
 (function() {
     // ============================================================
-    // 📋 视频URL大数组（直接填直链，自动编号）
+    // 📋 预设视频列表（可自由增删）
     // ============================================================
-var videoList = [
-    'https://lz0.qaiu.top/d/lz/iE6F6419hzob@bb',
-    'https://lz0.qaiu.top/d/lz/idSt841dzloj@oo',
-    'https://lz0.qaiu.top/d/lz/i9PaH41e6k9a@dsjs',
-    ''
-];
+    var videoList = [
+        'https://lz0.qaiu.top/d/lz/iE6F6419hzob@bb',
+        'https://lz0.qaiu.top/d/lz/idSt841dzloj@oo',
+        'https://lz0.qaiu.top/d/lz/i9PaH41e6k9a@dsjs',
+        'https://lz0.qaiu.top/d/lz/ife4H41gjwng@h36k'
+    ];
     // ============================================================
 
-    var listMode = document.getElementById('listMode');
-    var playerMode = document.getElementById('playerMode');
-    var videoGrid = document.getElementById('videoGrid');
-    var navBack = document.getElementById('navBack');
-    var navBackText = document.getElementById('navBackText');
-    var navTitle = document.getElementById('navTitle');
+    var grid = document.getElementById('videoGrid');
     var navInfo = document.getElementById('navInfo');
+    var input = document.getElementById('videoUrlInput');
+    var playBtn = document.getElementById('playBtn');
 
-    var video = document.getElementById('videoPlayer');
-    var source = document.getElementById('videoSource');
-    var playerName = document.getElementById('playerName');
-    var playerBadge = document.getElementById('playerBadge');
-    var statusMsg = document.getElementById('statusMsg');
-    var turboBtn = document.getElementById('turboBtn');
-    var speedSelect = document.getElementById('speedSelect');
-    var speedDisplay = document.getElementById('speedDisplay');
-
-    var currentIndex = -1;
-    var isTurboActive = false;
+    // 播放器地址（fpsgg.netlify.app）
+    var PLAYER_URL = 'https://fpsgg.netlify.app/player.html';
 
     // ============================================================
     // 1. 渲染列表
     // ============================================================
     function renderList() {
         if (videoList.length === 0) {
-            videoGrid.innerHTML = `<div class="empty-hint"><i class="fas fa-video"></i> 暂无视频</div>`;
+            grid.innerHTML = `<div class="empty-hint"><i class="fas fa-video"></i> 暂无视频</div>`;
             navInfo.textContent = '0 个视频';
             return;
         }
@@ -346,186 +233,113 @@ var videoList = [
         var html = '';
         videoList.forEach(function(url, index) {
             var num = index + 1;
+            // 从 URL 中提取文件名作为显示名
+            var name = url.split('/').pop().substring(0, 20) || '视频 ' + num;
             html += `
-                <div class="video-card" data-index="${index}">
+                <div class="video-card" data-url="${encodeURIComponent(url)}">
                     <div class="thumb">
                         <span class="play-icon"><i class="fas fa-play-circle"></i></span>
                         <span style="font-size:2rem;opacity:0.2;">🎬</span>
                     </div>
                     <div class="info">
-                        <div class="name">视频 ${num}</div>
-                        <div class="meta">第 ${num} 个</div>
+                        <div class="name">${name}</div>
+                        <div class="meta">视频 ${num}</div>
                     </div>
                 </div>
             `;
         });
-        videoGrid.innerHTML = html;
+        grid.innerHTML = html;
+
+        // 点击卡片 → 跳转到播放器
         document.querySelectorAll('.video-card').forEach(function(card) {
             card.addEventListener('click', function() {
-                var idx = parseInt(this.dataset.index);
-                playVideo(idx);
+                var url = decodeURIComponent(this.dataset.url);
+                playVideo(url);
             });
         });
     }
 
     // ============================================================
-    // 2. 播放视频
+    // 2. 播放视频（跳转到 fpsgg.netlify.app）
     // ============================================================
-    function playVideo(index) {
-        if (index < 0 || index >= videoList.length) {
-            statusMsg.innerHTML = '<i class="fas fa-exclamation-circle err"></i> 视频不存在';
+    function playVideo(url) {
+        if (!url || !url.trim()) {
+            alert('请输入视频地址');
             return;
         }
-        currentIndex = index;
-        var url = videoList[index];
-        source.src = url;
-        video.load();
-        playerName.textContent = '视频 ' + (index + 1);
-        playerBadge.textContent = 'MP4';
-        listMode.style.display = 'none';
-        playerMode.classList.add('active');
-        navBackText.textContent = '列表';
-        navTitle.textContent = '🎬 播放';
-        navInfo.textContent = '视频 ' + (index + 1);
-        statusMsg.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 加载中...';
-        // 重置倍速状态
-        isTurboActive = false;
-        turboBtn.classList.remove('active');
-        video.playbackRate = 1.0;
-        speedSelect.value = '1.0';
-        speedDisplay.textContent = '1.00×';
+        var encoded = encodeURIComponent(url.trim());
+        window.location.href = PLAYER_URL + '?url=' + encoded;
     }
 
     // ============================================================
-    // 3. 返回逻辑
+    // 3. 输入框播放
     // ============================================================
-    function goToList() {
-        listMode.style.display = 'block';
-        playerMode.classList.remove('active');
-        navBackText.textContent = '返回';
-        navTitle.textContent = '📋 视频列表';
-        navInfo.textContent = videoList.length + ' 个视频';
-        video.pause();
+    playBtn.addEventListener('click', function() {
+        var val = input.value.trim();
+        if (!val) {
+            alert('请输入视频地址');
+            return;
+        }
+        playVideo(val);
+    });
+
+    input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            playBtn.click();
+        }
+    });
+
+    // ============================================================
+    // 4. 支持蓝奏云链接自动解析（简单版）
+    // ============================================================
+    // 如果输入的是蓝奏云链接（包含 lanzou），自动转换为直链
+    // 这里使用 lz0.qaiu.top 服务
+    function parseLanzou(url) {
+        // 如果已经是直链，直接返回
+        if (url.includes('.mp4') || url.includes('.m3u8') || url.includes('.ts')) {
+            return url;
+        }
+        // 蓝奏云链接 → 转换为直链
+        // 格式：https://lz0.qaiu.top/d/lz/文件ID@密码
+        // 简单处理：如果是蓝奏云链接，提示用户使用直链
+        if (url.includes('lanzou')) {
+            alert('检测到蓝奏云链接，请使用工具获取直链后粘贴，或使用 lz0.qaiu.top 格式：\nhttps://lz0.qaiu.top/d/lz/文件ID@密码');
+            return null;
+        }
+        return url;
     }
 
-    navBack.addEventListener('click', function(e) {
-        if (playerMode.classList.contains('active')) {
-            e.preventDefault();
-            goToList();
-        } else {
-            window.location.href = 'index.html';
+    // 修改 playVideo 支持解析
+    var originalPlay = playVideo;
+    playVideo = function(url) {
+        var parsed = parseLanzou(url);
+        if (!parsed) return;
+        if (!parsed.trim()) {
+            alert('请输入视频地址');
+            return;
         }
-    });
+        var encoded = encodeURIComponent(parsed.trim());
+        window.location.href = PLAYER_URL + '?url=' + encoded;
+    };
+
+    // 重新绑定
+    playBtn.onclick = function() {
+        var val = input.value.trim();
+        if (!val) {
+            alert('请输入视频地址');
+            return;
+        }
+        playVideo(val);
+    };
+
+    input.onkeydown = function(e) {
+        if (e.key === 'Enter') {
+            playBtn.click();
+        }
+    };
 
     // ============================================================
-    // 4. 倍速控制（修复版）
-    // ============================================================
-    function updateSpeedDisplay(r) {
-        speedDisplay.textContent = r.toFixed(2) + '×';
-        var opt = Array.from(speedSelect.options).find(function(o) {
-            return Math.abs(parseFloat(o.value) - r) < 0.01;
-        });
-        if (opt) speedSelect.value = opt.value;
-    }
-
-    // 切换 3× 倍速
-    function toggleTurbo() {
-        if (isTurboActive) {
-            // 恢复到 1×
-            isTurboActive = false;
-            turboBtn.classList.remove('active');
-            video.playbackRate = 1.0;
-            updateSpeedDisplay(1.0);
-            speedSelect.value = '1.0';
-        } else {
-            // 切换到 3×
-            isTurboActive = true;
-            turboBtn.classList.add('active');
-            video.playbackRate = 3.0;
-            updateSpeedDisplay(3.0);
-            speedSelect.value = '3.0';
-        }
-    }
-
-    turboBtn.addEventListener('click', function(e) {
-        e.stopPropagation();
-        toggleTurbo();
-    });
-
-    // 下拉菜单控制倍速
-    speedSelect.addEventListener('change', function() {
-        var rate = parseFloat(this.value);
-        video.playbackRate = rate;
-        updateSpeedDisplay(rate);
-        // 如果下拉选了 3×，同步按钮状态
-        if (Math.abs(rate - 3.0) < 0.01) {
-            isTurboActive = true;
-            turboBtn.classList.add('active');
-        } else {
-            isTurboActive = false;
-            turboBtn.classList.remove('active');
-        }
-    });
-
-    // 监听视频倍速变化（键盘 K/J 等）
-    video.addEventListener('ratechange', function() {
-        var cur = video.playbackRate;
-        updateSpeedDisplay(cur);
-        // 同步下拉框
-        var opt = Array.from(speedSelect.options).find(function(o) {
-            return Math.abs(parseFloat(o.value) - cur) < 0.01;
-        });
-        if (opt) speedSelect.value = opt.value;
-        // 同步按钮状态
-        if (Math.abs(cur - 3.0) < 0.01) {
-            isTurboActive = true;
-            turboBtn.classList.add('active');
-        } else {
-            isTurboActive = false;
-            turboBtn.classList.remove('active');
-        }
-    });
-
-    // 键盘快捷键 K/J
-    document.addEventListener('keydown', function(e) {
-        if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
-        if (e.key === 'k' || e.key === 'K') {
-            e.preventDefault();
-            var cur = video.playbackRate;
-            var nr = Math.min(3.0, cur + 0.25);
-            video.playbackRate = nr;
-        }
-        if (e.key === 'j' || e.key === 'J') {
-            e.preventDefault();
-            var cur = video.playbackRate;
-            var nr = Math.max(0.25, cur - 0.25);
-            video.playbackRate = nr;
-        }
-    });
-
-    // ============================================================
-    // 5. 视频错误处理
-    // ============================================================
-    video.addEventListener('error', function(e) {
-        var err = video.error;
-        var msg = '视频加载失败';
-        if (err) {
-            switch(err.code) {
-                case 1: msg = '视频加载被中止'; break;
-                case 2: msg = '直链已过期，请更新视频地址'; break;
-                case 3: msg = '视频解码失败'; break;
-                case 4: msg = '视频地址无效'; break;
-            }
-        }
-        statusMsg.innerHTML = '<i class="fas fa-exclamation-circle err"></i> ' + msg;
-    });
-
-    video.addEventListener('canplay', function() {
-        statusMsg.innerHTML = '<i class="fas fa-check-circle ok"></i> ✅ 点击 3× 切换加速';
-    });
-
-    // ============================================================
-    // 6. 启动
+    // 5. 启动
     // ============================================================
     renderList();
 })();
