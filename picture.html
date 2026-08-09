@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <title>🖼️ 图片库</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #0f1a2e;
+            min-height: 100vh;
+            font-family: system-ui, -apple-system, sans-serif;
+            padding: 1rem;
+            color: #e8edf5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .nav-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.8rem 1.2rem;
+            background: rgba(255,255,255,0.05);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-radius: 16px;
+            margin-bottom: 1.5rem;
+            border: 1px solid rgba(255,255,255,0.06);
+            color: #c8d6e5;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .nav-bar .back-link {
+            color: #8ba0c9;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.9rem;
+            padding: 4px 12px;
+            border-radius: 40px;
+            transition: 0.2s;
+        }
+        .nav-bar .back-link:active { background: rgba(255,255,255,0.08); }
+        .nav-bar .title {
+            font-weight: 500;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .nav-bar .title i { color: #4ecdc4; }
+        .nav-bar .info {
+            font-size: 0.8rem;
+            color: #5a7a9f;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 4rem 1rem;
+            color: #5a7a9f;
+        }
+        .loading i {
+            font-size: 2.5rem;
+            display: block;
+            margin-bottom: 1rem;
+            color: #4ecdc4;
+        }
+        .spinner { animation: spin 1s linear infinite; }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .image-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 12px;
+            padding-bottom: 2rem;
+        }
+        .image-grid .img-item {
+            position: relative;
+            aspect-ratio: 1 / 1;
+            background: rgba(255,255,255,0.04);
+            border-radius: 12px;
+            overflow: hidden;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: 0.15s ease;
+        }
+        .image-grid .img-item:active {
+            transform: scale(0.94);
+            border-color: #4ecdc4;
+        }
+        .image-grid .img-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+        .image-grid .img-item .file-name {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 0.3rem 0.5rem;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            font-size: 0.55rem;
+            color: #aac3e0;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .image-grid .empty-item {
+            aspect-ratio: 1 / 1;
+            background: rgba(255,255,255,0.02);
+            border-radius: 12px;
+            border: 1px dashed rgba(255,255,255,0.06);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #3a5a7a;
+            font-size: 0.7rem;
+        }
+
+        /* ===== 全屏查看器 ===== */
+        .viewer-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.95);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            z-index: 999;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            padding: 1rem;
+            animation: fadeIn 0.25s ease;
+            touch-action: none;
+            overflow: hidden;
+        }
+        .viewer-overlay.active { display: flex; }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .viewer-wrapper {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        .viewer-image-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            touch-action: none;
+            cursor: grab;
+        }
+        .viewer-image-container:active {
+            cursor: grabbing;
+        }
+
+        .viewer-image {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            border-radius: 8px;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+            transition: none;
+            will-change: transform;
+            transform-origin: center center;
+        }
+
+        .viewer-close {
+            position: absolute;
+            top: 16px;
+            right: 20px;
+            color: #fff;
+            font-size: 1.8rem;
+            cursor: pointer;
+            background: rgba(0,0,0,0.5);
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: 0.2s;
+            z-index: 20;
+            touch-action: manipulation;
+        }
+        .viewer-close:active {
+            background: rgba(255,255,255,0.2);
+            transform: scale(0.9);
+        }
+
+        .viewer-counter {
+            position: absolute;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #8ba0c9;
+            font-size: 0.85rem;
+            background: rgba(0,0,0,0.6);
+            padding: 0.3rem 1.2rem;
+            border-radius: 40px;
+            border: 1px solid rgba(255,255,255,0.06);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            z-index: 20;
+            pointer-events: none;
+        }
+
+        .viewer-nav {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            color: rgba(255,255,255,0.35);
+            font-size: 2.2rem;
+            cursor: pointer;
+            padding: 0.5rem 1rem;
+            transition: 0.2s;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+            z-index: 15;
+            background: rgba(0,0,0,0.2);
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .viewer-nav:active {
+            color: #fff;
+            background: rgba(255,255,255,0.1);
+            transform: translateY(-50%) scale(1.1);
+        }
+        .viewer-nav.prev { left: 8px; }
+        .viewer-nav.next { right: 8px; }
+
+        .viewer-hint {
+            position: absolute;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255,255,255,0.25);
+            font-size: 0.7rem;
+            background: rgba(0,0,0,0.3);
+            padding: 0.2rem 1rem;
+            border-radius: 40px;
+            white-space: nowrap;
+            z-index: 15;
+            pointer-events: none;
+        }
+
+        @media (max-width: 768px) {
+            .image-grid {
+                grid-template-columns: repeat(4, 1fr);
+                gap: 8px;
+            }
+            .viewer-nav { width: 40px; height: 40px; font-size: 1.4rem; }
+            .viewer-close { top: 12px; right: 14px; width: 38px; height: 38px; font-size: 1.4rem; }
+            .viewer-counter { bottom: 16px; font-size: 0.7rem; padding: 0.2rem 0.8rem; }
+            .viewer-hint { display: none; }
+        }
+        @media (max-width: 480px) {
+            .image-grid {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 6px;
+            }
+            .nav-bar .title { font-size: 0.85rem; }
+            .nav-bar .info { font-size: 0.65rem; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="nav-bar">
+        <a href="index.html" class="back-link"><i class="fas fa-arrow-left"></i> 返回</a>
+        <span class="title"><i class="fas fa-images"></i> 图片库</span>
+        <span class="info" id="infoText">加载中...</span>
+    </div>
+    <div id="imageGrid" class="image-grid">
+        <div class="loading" style="grid-column:1/-1;">
+            <i class="fas fa-spinner spinner"></i>
+            正在下载并解析 ZIP 文件，请稍候...
+        </div>
+    </div>
+</div>
+
+<!-- ===== 查看器 ===== -->
+<div class="viewer-overlay" id="viewerOverlay">
+    <div class="viewer-wrapper" id="viewerWrapper">
+        <div class="viewer-close" id="viewerClose"><i class="fas fa-times"></i></div>
+        <div class="viewer-nav prev" id="viewerPrev"><i class="fas fa-chevron-left"></i></div>
+        <div class="viewer-nav next" id="viewerNext"><i class="fas fa-chevron-right"></i></div>
+        <div class="viewer-image-container" id="imageContainer">
+            <img class="viewer-image" id="viewerImage" src="" alt="预览" draggable="false">
+        </div>
+        <div class="viewer-counter" id="viewerCounter">1 / 1</div>
+        <div class="viewer-hint">🖱 双指缩放 · 拖动平移</div>
+    </div>
+</div>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+
+<script>
+    (function() {
+        // ============================================================
+        // 配置区：您的 ZIP 直链
+        // ============================================================
+        var ZIP_URL = 'https://zip1.webgetstore.com/2026/08/07/5e6a84c52ab31b22d541b1d0fe8168e1.zip?sg=26b8b9bef942e8a7aa8cc4e82aeea12e&e=6a77e8de&fileName=x6vTNXeEGgGx2M3n7ZIHe3sDyTbg628E.zip&fi=305841797';
+        // ============================================================
+
+        var grid = document.getElementById('imageGrid');
+        var infoText = document.getElementById('infoText');
+
+        // 查看器元素
+        var overlay = document.getElementById('viewerOverlay');
+        var wrapper = document.getElementById('viewerWrapper');
+        var container = document.getElementById('imageContainer');
+        var viewerImg = document.getElementById('viewerImage');
+        var viewerCounter = document.getElementById('viewerCounter');
+        var viewerClose = document.getElementById('viewerClose');
+        var viewerPrev = document.getElementById('viewerPrev');
+        var viewerNext = document.getElementById('viewerNext');
+
+        var imageItems = [];
+        var currentIndex = 0;
+
+        // ============================================================
+        // 变换状态（缩放 + 平移）
+        // ============================================================
+        var state = {
+            scale: 1,
+            translateX: 0,
+            translateY: 0
+        };
+        var minScale = 1;
+        var maxScale = 5;
+
+        // 临时状态（拖拽/缩放中）
+        var tempState = {
+            scale: 1,
+            translateX: 0,
+            translateY: 0
+        };
+        var isInteracting = false;
+
+        function applyTransform() {
+            var s = isInteracting ? tempState : state;
+            viewerImg.style.transform = 'translate(' + s.translateX + 'px, ' + s.translateY + 'px) scale(' + s.scale + ')';
+        }
+
+        function resetTransform() {
+            state.scale = 1;
+            state.translateX = 0;
+            state.translateY = 0;
+            isInteracting = false;
+            applyTransform();
+        }
+
+        function clampTransform() {
+            // 限制缩放范围
+            if (state.scale < minScale) state.scale = minScale;
+            if (state.scale > maxScale) state.scale = maxScale;
+            // 如果缩放为1，复位平移
+            if (state.scale <= 1.01) {
+                state.translateX = 0;
+                state.translateY = 0;
+            }
+        }
+
+        // ============================================================
+        // 加载 ZIP
+        // ============================================================
+        function loadZipAndExtract() {
+            infoText.textContent = '下载 ZIP...';
+            fetch(ZIP_URL)
+                .then(function(response) {
+                    if (!response.ok) throw new Error('HTTP ' + response.status);
+                    infoText.textContent = 'ZIP 下载完成，正在解压...';
+                    return response.arrayBuffer();
+                })
+                .then(function(buffer) { return JSZip.loadAsync(buffer); })
+                .then(function(zip) {
+                    infoText.textContent = '解压完成，提取图片...';
+                    var imageFiles = [];
+                    zip.forEach(function(path, file) {
+                        var name = file.name.toLowerCase();
+                        if (/\.(jpg|jpeg|png|gif|webp|bmp|svg|ico)$/.test(name)) {
+                            imageFiles.push(file);
+                        }
+                    });
+                    if (imageFiles.length === 0) throw new Error('未找到图片文件');
+                    infoText.textContent = '找到 ' + imageFiles.length + ' 张图片，正在加载...';
+                    return Promise.all(imageFiles.map(function(file) {
+                        return file.async('blob').then(function(blob) {
+                            return { name: file.name, url: URL.createObjectURL(blob) };
+                        });
+                    }));
+                })
+                .then(function(images) {
+                    imageItems = images;
+                    renderGrid(images);
+                    infoText.textContent = '✅ 共 ' + images.length + ' 张图片';
+                })
+                .catch(function(err) {
+                    console.error(err);
+                    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:3rem 1rem;color:#ff6b6b;"><i class="fas fa-exclamation-circle" style="font-size:2.5rem;display:block;margin-bottom:1rem;"></i><p>加载失败：' + (err.message || '未知错误') + '</p></div>';
+                    infoText.textContent = '❌ 加载失败';
+                });
+        }
+
+        function renderGrid(images) {
+            grid.innerHTML = '';
+            images.forEach(function(item, index) {
+                var div = document.createElement('div');
+                div.className = 'img-item';
+                var img = document.createElement('img');
+                img.src = item.url;
+                img.alt = item.name;
+                img.loading = 'lazy';
+                var nameSpan = document.createElement('div');
+                nameSpan.className = 'file-name';
+                nameSpan.textContent = item.name;
+                div.appendChild(img);
+                div.appendChild(nameSpan);
+                div.addEventListener('click', function() { openViewer(index); });
+                grid.appendChild(div);
+            });
+            var rem = images.length % 5;
+            if (rem !== 0) {
+                for (var i = 0; i < 5 - rem; i++) {
+                    var empty = document.createElement('div');
+                    empty.className = 'empty-item';
+                    empty.textContent = '📷';
+                    grid.appendChild(empty);
+                }
+            }
+        }
+
+        // ============================================================
+        // 查看器控制
+        // ============================================================
+        function openViewer(index) {
+            if (imageItems.length === 0) return;
+            currentIndex = index;
+            resetTransform();
+            updateViewerImage();
+            overlay.classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeViewer() {
+            overlay.classList.remove('active');
+            document.body.style.overflow = '';
+            resetTransform();
+        }
+
+        function updateViewerImage() {
+            var item = imageItems[currentIndex];
+            viewerImg.src = item.url;
+            viewerImg.alt = item.name;
+            viewerCounter.textContent = (currentIndex + 1) + ' / ' + imageItems.length;
+            resetTransform();
+        }
+
+        function prevImage() {
+            if (imageItems.length === 0) return;
+            currentIndex = (currentIndex - 1 + imageItems.length) % imageItems.length;
+            updateViewerImage();
+        }
+
+        function nextImage() {
+            if (imageItems.length === 0) return;
+            currentIndex = (currentIndex + 1) % imageItems.length;
+            updateViewerImage();
+        }
+
+        // ============================================================
+        // 鼠标滚轮缩放
+        // ============================================================
+        viewerImg.addEventListener('wheel', function(e) {
+            e.preventDefault();
+            var delta = e.deltaY > 0 ? -0.15 : 0.15;
+            var newScale = Math.min(maxScale, Math.max(minScale, state.scale + delta));
+            state.scale = newScale;
+            clampTransform();
+            applyTransform();
+        }, { passive: false });
+
+        // ============================================================
+        // 鼠标拖拽平移
+        // ============================================================
+        var isDragging = false;
+        var dragStartX = 0, dragStartY = 0;
+        var dragStartTranslateX = 0, dragStartTranslateY = 0;
+
+        container.addEventListener('mousedown', function(e) {
+            if (state.scale <= 1.01) return;
+            isDragging = true;
+            dragStartX = e.clientX;
+            dragStartY = e.clientY;
+            dragStartTranslateX = state.translateX;
+            dragStartTranslateY = state.translateY;
+            container.style.cursor = 'grabbing';
+            e.preventDefault();
+        });
+
+        document.addEventListener('mousemove', function(e) {
+            if (!isDragging) return;
+            var dx = e.clientX - dragStartX;
+            var dy = e.clientY - dragStartY;
+            state.translateX = dragStartTranslateX + dx;
+            state.translateY = dragStartTranslateY + dy;
+            applyTransform();
+        });
+
+        document.addEventListener('mouseup', function() {
+            if (isDragging) {
+                isDragging = false;
+                container.style.cursor = 'grab';
+                clampTransform();
+                applyTransform();
+            }
+        });
+
+        // ============================================================
+        // 触摸事件（双指缩放 + 单指拖拽）
+        // ============================================================
+        var touches = [];
+        var touchStartDist = 0;
+        var touchStartScale = 1;
+        var touchStartTranslateX = 0;
+        var touchStartTranslateY = 0;
+        var isTouchDragging = false;
+        var lastTouchX = 0, lastTouchY = 0;
+
+        container.addEventListener('touchstart', function(e) {
+            var t = e.touches;
+            if (t.length === 1) {
+                // 单指：拖拽
+                if (state.scale > 1.01) {
+                    isTouchDragging = true;
+                    lastTouchX = t[0].clientX;
+                    lastTouchY = t[0].clientY;
+                    touchStartTranslateX = state.translateX;
+                    touchStartTranslateY = state.translateY;
+                }
+            } else if (t.length === 2) {
+                // 双指：缩放
+                isTouchDragging = false;
+                var dx = t[0].clientX - t[1].clientX;
+                var dy = t[0].clientY - t[1].clientY;
+                touchStartDist = Math.sqrt(dx * dx + dy * dy);
+                touchStartScale = state.scale;
+                touchStartTranslateX = state.translateX;
+                touchStartTranslateY = state.translateY;
+            }
+            e.preventDefault();
+        }, { passive: false });
+
+        container.addEventListener('touchmove', function(e) {
+            var t = e.touches;
+            if (t.length === 1 && isTouchDragging) {
+                var dx = t[0].clientX - lastTouchX;
+                var dy = t[0].clientY - lastTouchY;
+                state.translateX = touchStartTranslateX + dx;
+                state.translateY = touchStartTranslateY + dy;
+                applyTransform();
+                e.preventDefault();
+            } else if (t.length === 2) {
+                var dx = t[0].clientX - t[1].clientX;
+                var dy = t[0].clientY - t[1].clientY;
+                var dist = Math.sqrt(dx * dx + dy * dy);
+                var scaleFactor = dist / touchStartDist;
+                var newScale = Math.min(maxScale, Math.max(minScale, touchStartScale * scaleFactor));
+                state.scale = newScale;
+                // 缩放中心保持图片中心，不平移
+                applyTransform();
+                e.preventDefault();
+            }
+        }, { passive: false });
+
+        container.addEventListener('touchend', function(e) {
+            isTouchDragging = false;
+            clampTransform();
+            applyTransform();
+            e.preventDefault();
+        }, { passive: false });
+
+        // ============================================================
+        // 双击放大/还原
+        // ============================================================
+        container.addEventListener('dblclick', function(e) {
+            e.preventDefault();
+            if (state.scale <= 1.05) {
+                state.scale = 2.5;
+                state.translateX = 0;
+                state.translateY = 0;
+            } else {
+                state.scale = 1;
+                state.translateX = 0;
+                state.translateY = 0;
+            }
+            applyTransform();
+        });
+
+        // ============================================================
+        // 按钮事件
+        // ============================================================
+        viewerClose.addEventListener('click', closeViewer);
+        viewerPrev.addEventListener('click', function(e) { e.stopPropagation(); prevImage(); });
+        viewerNext.addEventListener('click', function(e) { e.stopPropagation(); nextImage(); });
+
+        overlay.addEventListener('click', function(e) {
+            if (e.target === overlay || e.target === wrapper) closeViewer();
+        });
+
+        document.addEventListener('keydown', function(e) {
+            if (!overlay.classList.contains('active')) return;
+            if (e.key === 'Escape') { closeViewer(); }
+            else if (e.key === 'ArrowLeft') { e.preventDefault(); prevImage(); }
+            else if (e.key === 'ArrowRight') { e.preventDefault(); nextImage(); }
+        });
+
+        // ============================================================
+        // 启动
+        // ============================================================
+        loadZipAndExtract();
+
+        window.addEventListener('beforeunload', function() {
+            imageItems.forEach(function(item) {
+                if (item.url && item.url.startsWith('blob:')) URL.revokeObjectURL(item.url);
+            });
+        });
+
+    })();
+</script>
+</body>
+</html>
