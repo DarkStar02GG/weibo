@@ -2,9 +2,8 @@
 <html lang="zh">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
     <title>📊 演示文稿</title>
-    <!-- 引入 PDF.js 核心库 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -17,14 +16,14 @@
             justify-content: center;
         }
         .container {
-            max-width: 900px;
+            max-width: 1000px;
             width: 100%;
         }
         .nav-bar {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 0.8rem 1rem;
+            padding: 0.8rem 1.2rem;
             background: rgba(255,255,255,0.05);
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
@@ -36,7 +35,7 @@
             top: 1rem;
             z-index: 10;
             flex-wrap: wrap;
-            gap: 6px;
+            gap: 8px;
         }
         .nav-bar .back-link {
             color: #8ba0c9;
@@ -58,26 +57,44 @@
             gap: 8px;
         }
         .nav-bar .title i { color: #ff9f43; }
-        .nav-bar .page-info {
+        .nav-bar .info {
             font-size: 0.8rem;
             color: #5a7a9f;
         }
 
+        /* PDF 容器 */
         #pdfContainer {
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 1.2rem;
+            gap: 1.5rem;
             padding-bottom: 3rem;
         }
-        #pdfContainer canvas {
+
+        /* 每一页的包装器，支持缩放 */
+        .page-wrapper {
             width: 100%;
-            height: auto;
+            max-width: 900px;
+            position: relative;
+            background: white;
             border-radius: 12px;
             box-shadow: 0 8px 40px rgba(0,0,0,0.5);
-            background: white;
-            display: block;
+            overflow: hidden;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
         }
+        .page-wrapper canvas {
+            display: block;
+            width: 100%;
+            height: auto;
+            touch-action: none;
+            transition: none;
+            transform-origin: center center;
+            will-change: transform;
+        }
+
+        /* 加载状态 */
         .loading {
             text-align: center;
             padding: 4rem 1rem;
@@ -104,27 +121,72 @@
             display: block;
             margin-bottom: 1rem;
         }
-        .error-msg .detail {
-            font-size: 0.8rem;
-            color: #5a7a9f;
-            margin-top: 0.5rem;
-            word-break: break-all;
+
+        /* 缩放控制按钮（每页独立） */
+        .page-controls {
+            position: absolute;
+            bottom: 12px;
+            right: 12px;
+            display: flex;
+            gap: 6px;
+            z-index: 5;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            padding: 4px 6px;
+            border-radius: 40px;
+            border: 1px solid rgba(255,255,255,0.08);
+            opacity: 0;
+            transition: opacity 0.3s ease;
         }
+        .page-wrapper:hover .page-controls,
+        .page-wrapper:active .page-controls {
+            opacity: 1;
+        }
+        .page-controls button {
+            background: none;
+            border: none;
+            color: #c8d6e5;
+            font-size: 1rem;
+            cursor: pointer;
+            padding: 2px 10px;
+            border-radius: 30px;
+            transition: 0.2s;
+            touch-action: manipulation;
+        }
+        .page-controls button:active {
+            background: rgba(255,255,255,0.15);
+            transform: scale(0.9);
+        }
+        .page-controls .zoom-level {
+            color: #8ba0c9;
+            font-size: 0.7rem;
+            padding: 0 4px;
+            min-width: 40px;
+            text-align: center;
+            font-weight: 500;
+        }
+
         @media (max-width: 480px) {
             body { padding: 0.5rem; }
             .nav-bar { padding: 0.5rem 0.8rem; margin-bottom: 1rem; }
             .nav-bar .title { font-size: 0.85rem; }
-            #pdfContainer { gap: 0.8rem; }
+            #pdfContainer { gap: 1rem; }
+            .page-controls { opacity: 1; bottom: 8px; right: 8px; }
+            .page-controls button { font-size: 0.8rem; padding: 2px 8px; }
         }
     </style>
 </head>
 <body>
 <div class="container">
+    <!-- 导航栏 -->
     <div class="nav-bar">
         <a href="index.html" class="back-link"><i class="fas fa-arrow-left"></i> 返回</a>
         <span class="title"><i class="fas fa-file-pdf"></i> 演示文稿</span>
-        <span class="page-info" id="pageInfo">加载中...</span>
+        <span class="info" id="pageInfo">加载中...</span>
     </div>
+
+    <!-- PDF 渲染容器 -->
     <div id="pdfContainer">
         <div class="loading">
             <i class="fas fa-spinner spinner"></i>
@@ -138,7 +200,7 @@
 <script>
     (function() {
         // ============================================================
-        // ✅ 您的 PDF 下载直链
+        // ✅ PDF 直链
         // ============================================================
         var pdfUrl = 'https://lz0.qaiu.top/d/lz/iNlWE41czt5c';
         // ============================================================
@@ -146,24 +208,215 @@
         var container = document.getElementById('pdfContainer');
         var pageInfo = document.getElementById('pageInfo');
 
-        // 配置 PDF.js 工作线程
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-        // 禁用 PDF.js 的 CORS 限制（使用 CDN 代理）
-        // 设置全局的 HTTP 头，允许跨域
-        pdfjsLib.GlobalWorkerOptions.useSystemFonts = true;
+        // ============================================================
+        // 页面缩放控制
+        // ============================================================
+        function setupZoomControls(wrapper, canvas) {
+            var scale = 1;
+            var minScale = 1;
+            var maxScale = 4;
+            var translateX = 0;
+            var translateY = 0;
 
+            // 更新变换
+            function updateTransform() {
+                canvas.style.transform = 'translate(' + translateX + 'px, ' + translateY + 'px) scale(' + scale + ')';
+            }
+
+            // 重置
+            function resetZoom() {
+                scale = 1;
+                translateX = 0;
+                translateY = 0;
+                updateTransform();
+                updateLabel();
+            }
+
+            // 更新显示
+            function updateLabel() {
+                var label = wrapper.querySelector('.zoom-level');
+                if (label) label.textContent = Math.round(scale * 100) + '%';
+            }
+
+            // 放大
+            function zoomIn() {
+                if (scale < maxScale) {
+                    scale = Math.min(maxScale, scale + 0.25);
+                    updateTransform();
+                    updateLabel();
+                }
+            }
+
+            // 缩小
+            function zoomOut() {
+                if (scale > minScale) {
+                    scale = Math.max(minScale, scale - 0.25);
+                    if (scale <= 1.01) {
+                        scale = 1;
+                        translateX = 0;
+                        translateY = 0;
+                    }
+                    updateTransform();
+                    updateLabel();
+                }
+            }
+
+            // ---- 鼠标滚轮缩放 ----
+            canvas.addEventListener('wheel', function(e) {
+                e.preventDefault();
+                var delta = e.deltaY > 0 ? -0.15 : 0.15;
+                var newScale = Math.min(maxScale, Math.max(minScale, scale + delta));
+                if (newScale !== scale) {
+                    scale = newScale;
+                    if (scale <= 1.01) {
+                        scale = 1;
+                        translateX = 0;
+                        translateY = 0;
+                    }
+                    updateTransform();
+                    updateLabel();
+                }
+            }, { passive: false });
+
+            // ---- 鼠标拖拽平移 ----
+            var isDragging = false;
+            var startX = 0, startY = 0;
+            var startTranslateX = 0, startTranslateY = 0;
+
+            canvas.addEventListener('mousedown', function(e) {
+                if (scale <= 1.01) return;
+                isDragging = true;
+                startX = e.clientX;
+                startY = e.clientY;
+                startTranslateX = translateX;
+                startTranslateY = translateY;
+                canvas.style.cursor = 'grabbing';
+                e.preventDefault();
+            });
+
+            document.addEventListener('mousemove', function(e) {
+                if (!isDragging) return;
+                var dx = e.clientX - startX;
+                var dy = e.clientY - startY;
+                translateX = startTranslateX + dx;
+                translateY = startTranslateY + dy;
+                updateTransform();
+            });
+
+            document.addEventListener('mouseup', function() {
+                if (isDragging) {
+                    isDragging = false;
+                    canvas.style.cursor = 'default';
+                }
+            });
+
+            // ---- 触摸双指缩放 + 单指拖拽 ----
+            var lastTouchDist = 0;
+            var touchStartScale = 1;
+            var touchStartTranslateX = 0, touchStartTranslateY = 0;
+            var isTouchDragging = false;
+            var lastTouchX = 0, lastTouchY = 0;
+
+            canvas.addEventListener('touchstart', function(e) {
+                var t = e.touches;
+                if (t.length === 1) {
+                    if (scale > 1.01) {
+                        isTouchDragging = true;
+                        lastTouchX = t[0].clientX;
+                        lastTouchY = t[0].clientY;
+                        touchStartTranslateX = translateX;
+                        touchStartTranslateY = translateY;
+                    }
+                } else if (t.length === 2) {
+                    isTouchDragging = false;
+                    var dx = t[0].clientX - t[1].clientX;
+                    var dy = t[0].clientY - t[1].clientY;
+                    lastTouchDist = Math.sqrt(dx * dx + dy * dy);
+                    touchStartScale = scale;
+                    touchStartTranslateX = translateX;
+                    touchStartTranslateY = translateY;
+                }
+                e.preventDefault();
+            }, { passive: false });
+
+            canvas.addEventListener('touchmove', function(e) {
+                var t = e.touches;
+                if (t.length === 1 && isTouchDragging) {
+                    var dx = t[0].clientX - lastTouchX;
+                    var dy = t[0].clientY - lastTouchY;
+                    translateX = touchStartTranslateX + dx;
+                    translateY = touchStartTranslateY + dy;
+                    updateTransform();
+                    e.preventDefault();
+                } else if (t.length === 2) {
+                    var dx = t[0].clientX - t[1].clientX;
+                    var dy = t[0].clientY - t[1].clientY;
+                    var dist = Math.sqrt(dx * dx + dy * dy);
+                    var scaleFactor = dist / lastTouchDist;
+                    var newScale = Math.min(maxScale, Math.max(minScale, touchStartScale * scaleFactor));
+                    scale = newScale;
+                    if (scale <= 1.01) {
+                        scale = 1;
+                        translateX = 0;
+                        translateY = 0;
+                    }
+                    updateTransform();
+                    updateLabel();
+                    e.preventDefault();
+                }
+            }, { passive: false });
+
+            canvas.addEventListener('touchend', function(e) {
+                isTouchDragging = false;
+                e.preventDefault();
+            }, { passive: false });
+
+            // ---- 双击还原 ----
+            canvas.addEventListener('dblclick', function(e) {
+                e.preventDefault();
+                resetZoom();
+            });
+
+            // ---- 控制按钮 ----
+            var btnZoomIn = wrapper.querySelector('.btn-zoom-in');
+            var btnZoomOut = wrapper.querySelector('.btn-zoom-out');
+            var btnReset = wrapper.querySelector('.btn-reset');
+
+            if (btnZoomIn) btnZoomIn.addEventListener('click', function(e) { e.stopPropagation(); zoomIn(); });
+            if (btnZoomOut) btnZoomOut.addEventListener('click', function(e) { e.stopPropagation(); zoomOut(); });
+            if (btnReset) btnReset.addEventListener('click', function(e) { e.stopPropagation(); resetZoom(); });
+
+            // 初始显示
+            updateLabel();
+
+            // 暴露方法给外部（如翻页后重置）
+            wrapper._resetZoom = resetZoom;
+        }
+
+        // ============================================================
+        // 渲染所有页面
+        // ============================================================
         function renderAllPages(pdf) {
             var totalPages = pdf.numPages;
-            pageInfo.textContent = '共 ' + totalPages + ' 页 · 下滑浏览';
+            pageInfo.textContent = '共 ' + totalPages + ' 页 · 滚轮缩放 · 拖动平移';
+
+            // 清除加载提示
             container.innerHTML = '';
 
-            var loadedCount = 0;
+            // 循环渲染每一页
             for (var pageNum = 1; pageNum <= totalPages; pageNum++) {
                 (function(pageNumber) {
                     pdf.getPage(pageNumber).then(function(page) {
                         var scale = 1.5;
                         var viewport = page.getViewport({ scale: scale });
+
+                        // 创建包装器
+                        var wrapper = document.createElement('div');
+                        wrapper.className = 'page-wrapper';
+
+                        // 创建 Canvas
                         var canvas = document.createElement('canvas');
                         var context = canvas.getContext('2d');
                         canvas.width = viewport.width;
@@ -171,22 +424,35 @@
                         canvas.style.width = '100%';
                         canvas.style.height = 'auto';
 
+                        // 控制按钮
+                        var controls = document.createElement('div');
+                        controls.className = 'page-controls';
+                        controls.innerHTML = `
+                            <button class="btn-zoom-out"><i class="fas fa-minus"></i></button>
+                            <span class="zoom-level">100%</span>
+                            <button class="btn-zoom-in"><i class="fas fa-plus"></i></button>
+                            <button class="btn-reset" style="font-size:0.8rem;padding:0 6px;"><i class="fas fa-undo-alt"></i></button>
+                        `;
+
+                        wrapper.appendChild(canvas);
+                        wrapper.appendChild(controls);
+                        container.appendChild(wrapper);
+
+                        // 渲染 PDF
                         var renderContext = {
                             canvasContext: context,
                             viewport: viewport
                         };
                         page.render(renderContext).promise.then(function() {
-                            container.appendChild(canvas);
-                            loadedCount++;
-                            if (loadedCount === totalPages) {
-                                pageInfo.textContent = '✅ 共 ' + totalPages + ' 页 · 加载完成';
-                            }
+                            // 渲染完成后启用缩放控制
+                            setupZoomControls(wrapper, canvas);
                         }).catch(function(err) {
                             console.warn('第 ' + pageNumber + ' 页渲染失败:', err);
+                            canvas.style.display = 'none';
                             var errorDiv = document.createElement('div');
-                            errorDiv.style.cssText = 'padding:2rem;color:#ff6b6b;text-align:center;background:rgba(255,0,0,0.05);border-radius:12px;width:100%;';
+                            errorDiv.style.cssText = 'padding:1rem;color:#ff6b6b;text-align:center;font-size:0.8rem;';
                             errorDiv.textContent = '⚠️ 第 ' + pageNumber + ' 页加载失败';
-                            container.appendChild(errorDiv);
+                            wrapper.appendChild(errorDiv);
                         });
                     }).catch(function(err) {
                         console.warn('获取第 ' + pageNumber + ' 页失败:', err);
@@ -196,32 +462,35 @@
         }
 
         // ============================================================
-        // 使用 fetch + Blob 方式加载 PDF（绕过跨域限制）
+        // 加载 PDF
         // ============================================================
-        function loadPDFWithFetch() {
-            pageInfo.textContent = '正在下载 PDF...';
+        function loadPDF() {
+            // 检查链接
+            if (pdfUrl.includes('.pptx')) {
+                container.innerHTML = `
+                    <div class="error-msg">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <p>检测到 PPT 文件链接，请先转换为 PDF 格式。</p>
+                        <p style="font-size:0.8rem;color:#5a7a9f;margin-top:0.5rem;">提示：用 WPS / PowerPoint 打开后另存为 PDF</p>
+                    </div>
+                `;
+                pageInfo.textContent = '格式错误';
+                return;
+            }
 
+            // 使用 fetch + ArrayBuffer 加载（绕过跨域）
+            pageInfo.textContent = '正在下载 PDF...';
             fetch(pdfUrl, {
                 method: 'GET',
-                mode: 'cors',  // 尝试跨域请求
-                headers: {
-                    'Accept': 'application/pdf'
-                }
+                mode: 'cors',
+                headers: { 'Accept': 'application/pdf' }
             })
             .then(function(response) {
-                if (!response.ok) {
-                    throw new Error('HTTP ' + response.status + ': ' + response.statusText);
-                }
-                // 检查 Content-Type
-                var contentType = response.headers.get('content-type');
-                if (contentType && !contentType.includes('pdf') && !contentType.includes('octet-stream')) {
-                    console.warn('Content-Type 不是 PDF:', contentType);
-                }
+                if (!response.ok) throw new Error('HTTP ' + response.status);
                 return response.arrayBuffer();
             })
             .then(function(arrayBuffer) {
                 pageInfo.textContent = 'PDF 下载完成，正在解析...';
-                // 使用 arrayBuffer 加载 PDF
                 return pdfjsLib.getDocument({ data: arrayBuffer }).promise;
             })
             .then(function(pdf) {
@@ -229,22 +498,18 @@
             })
             .catch(function(err) {
                 console.error('PDF 加载失败:', err);
-                // 尝试直接用 URL 加载（备用方案）
+                // 备用：直接用 URL 加载
                 pageInfo.textContent = '尝试备用加载方式...';
                 pdfjsLib.getDocument({ url: pdfUrl, withCredentials: false }).promise
                     .then(function(pdf) {
                         renderAllPages(pdf);
                     })
                     .catch(function(err2) {
-                        console.error('备用加载也失败:', err2);
                         container.innerHTML = `
                             <div class="error-msg">
                                 <i class="fas fa-exclamation-circle"></i>
                                 <p>文档加载失败，请检查链接是否有效。</p>
-                                <p class="detail">错误信息：${err2.message || err.message || '未知错误'}</p>
-                                <p class="detail" style="margin-top:0.8rem;font-size:0.7rem;color:#4a6a8f;">
-                                    💡 提示：PDF 直链可能有时效性，请重新获取最新链接
-                                </p>
+                                <p style="font-size:0.8rem;color:#5a7a9f;margin-top:0.5rem;">${err2.message || err.message || '未知错误'}</p>
                             </div>
                         `;
                         pageInfo.textContent = '加载失败';
@@ -253,9 +518,14 @@
         }
 
         // ============================================================
-        // 启动加载
+        // 启动
         // ============================================================
-        loadPDFWithFetch();
+        loadPDF();
+
+        // 页面卸载时清理
+        window.addEventListener('beforeunload', function() {
+            // 无需特别清理
+        });
     })();
 </script>
 </body>
