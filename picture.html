@@ -5,9 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
     <title>🖼️ 图片库</title>
 
-    <!-- ✅ 改这里：换成国内可访问的 CDN -->
+    <!-- ========== 依赖库：国内可用 CDN ========== -->
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-    <!-- 兜底：如果上面没加载成功，自动再试一个 -->
     <script>
         if (typeof JSZip === 'undefined') {
             document.write('<script src="https://lf26-cdn-tos.bytecdntp.com/cdn/expire-1-M/jszip/3.10.1/jszip.min.js"><\/script>');
@@ -342,9 +341,15 @@
 <script>
     (function() {
         // ============================================================
-        // 配置区：您的 ZIP 直链
+        // ✅ 配置区：多个 ZIP 链接数组
+        // 以后要加图片，就打包成新 ZIP，把链接追加到这个数组里即可
         // ============================================================
-        var ZIP_URL = 'https://lz0.qaiu.top/d/lz/iMlXC4aufsve@b9yy';
+        var ZIP_URLS = [
+            'https://lz0.qaiu.top/d/lz/iMlXC4aufsve@b9yy'
+            // 在这里继续加，用逗号分隔，例如：
+            // 'https://example.com/another.zip',
+            // 'https://example.com/more.zip',
+        ];
         // ============================================================
 
         var grid = document.getElementById('imageGrid');
@@ -374,7 +379,6 @@
         var minScale = 1;
         var maxScale = 5;
 
-        // 临时状态（拖拽/缩放中）
         var tempState = {
             scale: 1,
             translateX: 0,
@@ -405,11 +409,9 @@
         }
 
         // ============================================================
-        // 加载 ZIP
+        // 核心：并行加载多个 ZIP，合并所有图片
         // ============================================================
-        function loadZipAndExtract() {
-
-            // ✅ 改这里：先检查 JSZip 是否加载成功，给出明确提示
+        function loadAllZips() {
             if (typeof JSZip === 'undefined') {
                 grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:3rem 1rem;color:#ff6b6b;">'
                     + '<i class="fas fa-exclamation-circle" style="font-size:2.5rem;display:block;margin-bottom:1rem;"></i>'
@@ -418,35 +420,37 @@
                 return;
             }
 
-            infoText.textContent = '下载 ZIP...';
-            fetch(ZIP_URL)
-                .then(function(response) {
-                    if (!response.ok) throw new Error('HTTP ' + response.status);
-                    infoText.textContent = 'ZIP 下载完成，正在解压...';
-                    return response.arrayBuffer();
-                })
-                .then(function(buffer) { return JSZip.loadAsync(buffer); })
-                .then(function(zip) {
-                    infoText.textContent = '解压完成，提取图片...';
-                    var imageFiles = [];
-                    zip.forEach(function(path, file) {
-                        var name = file.name.toLowerCase();
-                        if (/\.(jpg|jpeg|png|gif|webp|bmp|svg|ico)$/.test(name)) {
-                            imageFiles.push(file);
+            if (!ZIP_URLS || ZIP_URLS.length === 0) {
+                grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:3rem 1rem;color:#ff6b6b;">'
+                    + '<p>没有配置任何 ZIP 链接，请在 ZIP_URLS 数组中添加。</p></div>';
+                infoText.textContent = '⚠️ 未配置 ZIP';
+                return;
+            }
+
+            infoText.textContent = '准备加载 ' + ZIP_URLS.length + ' 个 ZIP...';
+
+            // 每个 ZIP 独立处理，返回 { zipName, images: [...] }，最终扁平化合并
+            var tasks = ZIP_URLS.map(function(url, idx) {
+                return loadSingleZip(url, idx);
+            });
+
+            Promise.all(tasks)
+                .then(function(results) {
+                    // 合并所有 ZIP 中的图片
+                    var allImages = [];
+                    results.forEach(function(res) {
+                        if (res && res.images) {
+                            allImages = allImages.concat(res.images);
                         }
                     });
-                    if (imageFiles.length === 0) throw new Error('未找到图片文件');
-                    infoText.textContent = '找到 ' + imageFiles.length + ' 张图片，正在加载...';
-                    return Promise.all(imageFiles.map(function(file) {
-                        return file.async('blob').then(function(blob) {
-                            return { name: file.name, url: URL.createObjectURL(blob) };
-                        });
-                    }));
-                })
-                .then(function(images) {
-                    imageItems = images;
-                    renderGrid(images);
-                    infoText.textContent = '✅ 共 ' + images.length + ' 张图片';
+
+                    if (allImages.length === 0) {
+                        throw new Error('所有 ZIP 中均未找到图片文件');
+                    }
+
+                    imageItems = allImages;
+                    renderGrid(imageItems);
+                    infoText.textContent = '✅ 共 ' + imageItems.length + ' 张图片（来自 ' + ZIP_URLS.length + ' 个 ZIP）';
                 })
                 .catch(function(err) {
                     console.error(err);
@@ -457,6 +461,50 @@
                 });
         }
 
+        // 单个 ZIP 下载 + 解压 + 提取图片 blob URL
+        function loadSingleZip(url, idx) {
+            return fetch(url)
+                .then(function(response) {
+                    if (!response.ok) throw new Error('ZIP[' + (idx+1) + '] HTTP ' + response.status);
+                    return response.arrayBuffer();
+                })
+                .then(function(buffer) { return JSZip.loadAsync(buffer); })
+                .then(function(zip) {
+                    var imageFiles = [];
+                    zip.forEach(function(path, file) {
+                        var name = file.name.toLowerCase();
+                        // 跳过目录、跳过 macOS 的 __MACOSX 杂物
+                        if (file.dir) return;
+                        if (name.indexOf('__macosx') !== -1) return;
+                        if (/\.(jpg|jpeg|png|gif|webp|bmp|svg|ico)$/.test(name)) {
+                            imageFiles.push(file);
+                        }
+                    });
+                    if (imageFiles.length === 0) {
+                        console.warn('ZIP[' + (idx+1) + '] 中没有图片，已跳过');
+                        return { zipIndex: idx, images: [] };
+                    }
+                    return Promise.all(imageFiles.map(function(file) {
+                        return file.async('blob').then(function(blob) {
+                            return {
+                                name: file.name.split('/').pop(), // 只显示文件名，不显示内部路径
+                                url: URL.createObjectURL(blob)
+                            };
+                        });
+                    })).then(function(images) {
+                        return { zipIndex: idx, images: images };
+                    });
+                })
+                .catch(function(err) {
+                    console.error('ZIP[' + (idx+1) + '] 加载失败:', err);
+                    // 单个 ZIP 失败不影响其他 ZIP，返回空，继续合并
+                    return { zipIndex: idx, images: [], error: err.message };
+                });
+        }
+
+        // ============================================================
+        // 网格渲染（5列，不足补空位）
+        // ============================================================
         function renderGrid(images) {
             grid.innerHTML = '';
             images.forEach(function(item, index) {
@@ -670,7 +718,7 @@
         // ============================================================
         // 启动
         // ============================================================
-        loadZipAndExtract();
+        loadAllZips();
 
         window.addEventListener('beforeunload', function() {
             imageItems.forEach(function(item) {
