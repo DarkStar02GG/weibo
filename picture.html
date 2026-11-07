@@ -5,11 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
     <title>🖼️ 图片库</title>
 
-    <!-- ========== 依赖库：国内可用 CDN ========== -->
-    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <!-- ========== 依赖库：cdnjs（Cloudflare） + 国内兜底 ========== -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script>
         if (typeof JSZip === 'undefined') {
-            document.write('<script src="https://lf26-cdn-tos.bytecdntp.com/cdn/expire-1-M/jszip/3.10.1/jszip.min.js"><\/script>');
+            document.write('<script src="https://cdn.staticfile.net/jszip/3.10.1/jszip.min.js"><\/script>');
         }
     </script>
 
